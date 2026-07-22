@@ -14,7 +14,7 @@ usage:
 `
 
 // dispatch routes a subcommand to its entry point and returns the process exit
-// code. It is the whole CLI surface for ticket 01; launch/pack bodies are stubs.
+// code. It is the whole CLI surface for ticket 01.
 func dispatch(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, usage)
@@ -29,11 +29,6 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "gho: unknown command %q\n\n%s", args[0], usage)
 		return 2
 	}
-}
-
-func runPack(args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stdout, "pack: not implemented yet")
-	return 0
 }
 
 func main() {
