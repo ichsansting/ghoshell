@@ -89,7 +89,11 @@ gho_main() {
     vault="$dir/vault.bin"
     gho_fetch "https://raw.githubusercontent.com/${GHOSHELL_REPO}/${GHOSHELL_BRANCH}/${GHOSHELL_VAULT_PATH}" "$vault"
 
-    exec "$bin" launch "$vault"
+    # `curl ... | sh` makes sh's stdin the pipe carrying this script's own
+    # source, not the terminal — exec would inherit that fd, and gho's
+    # passphrase prompt would fail with ENOTTY. Re-point stdin at the
+    # controlling terminal before handing off.
+    exec "$bin" launch "$vault" < /dev/tty
 }
 
 # gho_test.sh sources this file with GHO_SH_TEST=1 to unit-test gho_target
