@@ -40,3 +40,10 @@ the trap that cleans up `dir` on early failure never runs on that path — the
 downloaded binary and vault copy are left behind. Accepted ceiling, noted
 inline in `gho.sh`: neither file is secret (the vault is public+encrypted
 per spec), and `dir` is RAM-backed or `$TMPDIR`-bounded either way.
+
+**Follow-up bug (found during 08's real-repo verification):** `curl -fsSL url
+| sh` makes `sh`'s stdin the pipe carrying gho.sh's own source, not the
+terminal — `exec` inherited that fd, so `gho launch`'s passphrase prompt hit
+ENOTTY on every real one-liner run; it never actually worked interactively.
+Fixed by redirecting stdin from `/dev/tty` immediately before the `exec`
+handoff. Verified against the real repo in a pty (`curl | sh` end to end).
