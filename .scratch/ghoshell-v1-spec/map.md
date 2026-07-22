@@ -27,12 +27,17 @@ grilling type by default). Resolve one ticket per session.
 <!-- one line per closed ticket: gist + link -->
 
 - [01 — Launcher language & runtime](issues/01-launcher-language-runtime.md) — ghoshell is **one static Go binary** (`CGO_ENABLED=0`, no libc dep, cross-compiles to arm64+x86_64 × mac+linux), bootstrapped by a thin POSIX-sh one-liner; **curl-or-wget** fetch floor (base64-embed only a documented escape hatch); binary lands RAM-backed (tmpfs) with temp-dir fallback; single binary with `pack`/`launch` subcommands.
+- [02 — Distribution & the one-liner bootstrap](issues/02-distribution-one-liner.md) — **stable typed URL** (`.../releases/latest/download/gho | sh`, byte-identical across OS/arch/version) fetches a POSIX-sh **bootstrap script** that `uname`-detects and pulls the matching binary from **GitHub Releases**; the paste carries **nothing profile-specific or secret**; sequence is **decrypt-then-pick** — passphrase unlocks the vault, then a **binary-built-in fuzzy picker** (no `fzf` dep) selects the profile; **TLS-only** integrity for v1 (documented ceiling: checksum-in-script → signing; version pinning; URL ergonomics all bolt on later).
 
 ## Not yet specified
 
 - Exact wipe **contract** (scrub-on-exit vs. rely on tmpfs teardown vs. both) — [01] fixed *where* the binary lands (RAM-preferred); the scrub contract sharpens after [04].
 - Update / re-lock flow — how a changed environment gets re-bundled.
-- Multi-profile support (more than one environment in one vault).
+- Multi-profile support (more than one environment in one vault). **Now constrained by [02]:**
+  one passphrase unlocks a vault holding *many* profiles (work/personal, and auth variants like
+  Claude API vs subscription); profiles are chosen by a binary-built-in fuzzy picker *after*
+  decrypt, so profile names live only inside the encrypted vault. Sharpens into tickets once
+  [04] defines the vault's shape.
 
 ## Out of scope
 
