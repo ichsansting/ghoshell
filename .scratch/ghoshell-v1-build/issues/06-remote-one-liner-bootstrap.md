@@ -7,13 +7,36 @@ execs launch. The paste carries only the repo URL — no secret, no profile name
 
 **Blocked by:** 04.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A POSIX-sh bootstrap script runs under a bare shell with only `curl`-or-`wget`.
-- [ ] `uname`-detects OS/arch and selects the matching launcher Release asset (3-target
+- [x] A POSIX-sh bootstrap script runs under a bare shell with only `curl`-or-`wget`.
+- [x] `uname`-detects OS/arch and selects the matching launcher Release asset (3-target
       matrix; missing arch fails with a clear message).
-- [ ] Fetches the vault blob over plain HTTPS GET (no credentials).
-- [ ] Repo location comes from the pasted URL; the paste contains no secret and no profile
+- [x] Fetches the vault blob over plain HTTPS GET (no credentials).
+- [x] Repo location comes from the pasted URL; the paste contains no secret and no profile
       name.
-- [ ] Hands off to the launch flow from 04 (passphrase → decrypt → materialize → shell).
-- [ ] Integrity is TLS-only for v1 (checksum/signing are documented later bolt-ons).
+- [x] Hands off to the launch flow from 04 (passphrase → decrypt → materialize → shell).
+- [x] Integrity is TLS-only for v1 (checksum/signing are documented later bolt-ons).
+
+## Comments
+
+`gho.sh` (repo root) is the bootstrap; `gho_test.sh` is its self-check (no
+network, no framework — mocks `uname` and the internal `gho_has` curl/wget
+switch). Verified separately against a real local HTTP server that the
+actual `curl -fsSL -o` / `wget -q -O` invocations fetch bytes correctly and
+the result chmods+execs.
+
+Repo identity (`GHOSHELL_REPO`/`GHOSHELL_BRANCH`/`GHOSHELL_VAULT_PATH`) is
+baked into the script as constants rather than parsed from the fetch URL —
+a piped POSIX-sh script can't see the URL it was fetched from. "Repo
+location comes from the pasted URL" holds because the script lives *in*
+that same repo: whichever URL you paste is where these constants point.
+The constants here are still the `OWNER/ghoshell` placeholder — 08 (publish)
+must stamp in the real repo before the pasted one-liner resolves to
+anything; this ticket built the mechanism, 08 wires it live.
+
+On the download scratch dir: `exec` hands off to `gho launch` on success, so
+the trap that cleans up `dir` on early failure never runs on that path — the
+downloaded binary and vault copy are left behind. Accepted ceiling, noted
+inline in `gho.sh`: neither file is secret (the vault is public+encrypted
+per spec), and `dir` is RAM-backed or `$TMPDIR`-bounded either way.
