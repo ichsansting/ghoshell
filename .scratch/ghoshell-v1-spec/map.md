@@ -26,10 +26,11 @@ grilling type by default). Resolve one ticket per session.
 
 <!-- one line per closed ticket: gist + link -->
 
+- [01 — Launcher language & runtime](issues/01-launcher-language-runtime.md) — ghoshell is **one static Go binary** (`CGO_ENABLED=0`, no libc dep, cross-compiles to arm64+x86_64 × mac+linux), bootstrapped by a thin POSIX-sh one-liner; **curl-or-wget** fetch floor (base64-embed only a documented escape hatch); binary lands RAM-backed (tmpfs) with temp-dir fallback; single binary with `pack`/`launch` subcommands.
+
 ## Not yet specified
 
-<!-- graduates as 01 & 04 resolve -->
-- Exact wipe mechanism (tmpfs vs. scrub-on-exit vs. both) — sharpens after [01] and [04].
+- Exact wipe **contract** (scrub-on-exit vs. rely on tmpfs teardown vs. both) — [01] fixed *where* the binary lands (RAM-preferred); the scrub contract sharpens after [04].
 - Update / re-lock flow — how a changed environment gets re-bundled.
 - Multi-profile support (more than one environment in one vault).
 
