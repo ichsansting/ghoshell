@@ -7,17 +7,24 @@ real binary for the detected arch and a real vault, end to end.
 
 **Blocked by:** 06, 07.
 
-**Status:** done (narrowed scope — see Comments)
+**Status:** done (manual release, no CI — see Comments)
 
-- [ ] CI cross-compiles static binaries for `darwin/arm64`, `linux/arm64`, `linux/amd64`
-      (`CGO_ENABLED=0`). — descoped, see Comments.
-- [ ] Each arch binary is published as a versioned GitHub Release asset the bootstrap (06)
-      can select by `uname`. — descoped, see Comments.
-- [ ] Release tagging gives launcher versioning/rollback for free; vault rollback rides the
-      repo's commit history. — descoped, see Comments.
-- [ ] End-to-end smoke: the one-liner on a linux target fetches the published binary + vault
-      and reaches the launch flow. — descoped along with the release pipeline it depends on,
-      see Comments.
+- [x] Binaries cross-compiled for `darwin/arm64`, `linux/arm64`, `linux/amd64`
+      (`CGO_ENABLED=0`) — done manually (`go build`), not via CI. See Comments.
+- [x] Each arch binary published as a GitHub Release asset (`gho-<os>-<arch>`) the
+      bootstrap (06) selects by `uname` — done manually via `gh release create`, tag
+      `v0.1.0`. Not wired to CI, so cutting the next release is a manual repeat of the
+      same steps.
+- [ ] Release tagging gives launcher versioning/rollback for free — the mechanism exists
+      (tags), but nothing automates cutting a new one; each release is a manual step for
+      now.
+- [x] End-to-end smoke: verified against the real repo — `gho.sh` fetched unmodified from
+      `raw.githubusercontent.com`, resolves the release asset via a real 302 redirect to
+      `releases/download/v0.1.0/gho-linux-amd64`, and `vault.bin` fetches 200 from
+      `main`. Ran the fetched binary against the fetched vault directly (this sandbox's
+      `/dev/shm` is mounted `noexec`, so the one-liner's own `exec` step can't be
+      exercised here — see Comments) and confirmed it reaches `gho launch`'s passphrase
+      prompt.
 - [x] `gho.sh`'s `GHOSHELL_REPO` is stamped with the real repo (`ichsansting/ghoshell`)
       instead of the `OWNER/ghoshell` placeholder.
 - [x] `gho pack` can create the first vault, not just re-seal an existing one — a gap that
@@ -25,8 +32,9 @@ real binary for the detected arch and a real vault, end to end.
 
 ## Comments
 
-Re-scoped with the user mid-implementation: no GitHub Actions release workflow for now (they
-build/install the `gho` binary themselves — `go build -o gho .`). What shipped instead:
+Re-scoped with the user mid-implementation: no GitHub Actions workflow — they build the
+`gho` binary and (for now) cut releases manually via `gh release create`/`gh release
+upload` rather than through CI. What shipped:
 
 1. `gho.sh` now points at the real repo (`ichsansting/ghoshell`) rather than the placeholder.
 2. `pack()` (`pack.go`) previously required an existing vault (`os.ReadFile` on a missing
@@ -34,15 +42,22 @@ build/install the `gho` binary themselves — `go build -o gho .`). What shipped
    `gho pack` only re-seals. Added a bootstrap path: a missing `vaultPath` now starts from an
    empty manifest instead of erroring, so `gho pack <new-path>` creates *and* pushes the first
    vault. Covered by `TestPackBootstrapsNewVault` (real local git remote, same pattern as
-   `TestPackRoundTrip`).
+   `TestPackRoundTrip`). The user ran this themselves to author a real profile (`fish` +
+   `starship` tools, a `.config/fish/config.fish` sourcing `starship init fish`) — passphrase
+   was theirs, entered at their own terminal, never seen or scripted by the agent.
+3. Cross-compiled all three targets (`CGO_ENABLED=0`) and published them as release `v0.1.0`
+   via `gh release create` — a one-off manual run, not a workflow. Verified end-to-end against
+   the real GitHub repo (raw fetch of `gho.sh`, redirect resolution of the release asset,
+   fetch of `vault.bin`, and running the fetched binary against the fetched vault to confirm
+   it reaches the passphrase prompt). The one-liner itself (`curl | sh`) could not be run
+   start-to-finish in this sandbox because its container mounts `/dev/shm` `noexec`, which
+   blocks `gho.sh`'s own `exec` of the binary it downloads there — that's this sandbox's
+   restriction, not a bug in `gho.sh` (ticket 06); worth knowing about if it ever shows up on
+   a real machine with a hardened `/dev/shm`, since `gho_workdir` currently checks only `-d`
+   and `-w`, not executability, before picking a base dir.
 
-Deliberately NOT done here, left for the user:
-- Actually authoring the real vault content (a profile with `fish` + `starship` tools and a
-  `.config/fish/config.fish` sourcing `starship init fish`) — passphrase is the user's to set,
-  so they run `gho pack vault.bin` themselves at their own terminal rather than me scripting a
-  passphrase into a command.
-- The CI cross-compile + GitHub Release publish pipeline this ticket was originally scoped
-  around. If that's wanted later, `gho.sh` already expects release assets named
-  `gho-<os>-<arch>` (e.g. `gho-linux-amd64`) fetched via
-  `github.com/<repo>/releases/latest/download/`, so a future workflow just needs to produce
-  and upload those under that naming.
+Deliberately not automated: cutting a *new* release still means re-running the cross-compile
++ `gh release create` steps by hand. `gho.sh` already expects release assets named
+`gho-<os>-<arch>` fetched via `github.com/<repo>/releases/latest/download/`, so a future CI
+workflow just needs to produce and upload those under that naming — no changes needed on the
+`gho.sh` side.
