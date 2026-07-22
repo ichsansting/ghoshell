@@ -14,7 +14,7 @@ func TestDispatch(t *testing.T) {
 		wantOut  string // substring expected on stdout
 		wantErr  string // substring expected on stderr
 	}{
-		{"launch dispatches", []string{"launch"}, 0, "launch", ""},
+		{"launch without vault path is a usage error", []string{"launch"}, 2, "", "vault path"},
 		{"pack dispatches", []string{"pack"}, 0, "pack", ""},
 		{"no subcommand prints usage, non-zero", nil, 2, "", "usage:"},
 		{"unknown subcommand prints usage, non-zero", []string{"bogus"}, 2, "", "unknown command"},

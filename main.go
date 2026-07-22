@@ -31,11 +31,6 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-func runLaunch(args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stdout, "launch: not implemented yet")
-	return 0
-}
-
 func runPack(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "pack: not implemented yet")
 	return 0
