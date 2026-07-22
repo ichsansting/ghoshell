@@ -11,10 +11,9 @@
 set -eu
 
 # ponytail: repo identity is baked in here rather than parsed from the URL
-# this script was fetched from — piped POSIX sh can't see its own URL. The
-# publish step (ticket 08) sets these for the real repo; override for local
-# testing.
-: "${GHOSHELL_REPO:=OWNER/ghoshell}"
+# this script was fetched from — piped POSIX sh can't see its own URL.
+# Stamped to the real repo (ticket 08); override for local testing.
+: "${GHOSHELL_REPO:=ichsansting/ghoshell}"
 : "${GHOSHELL_BRANCH:=main}"
 : "${GHOSHELL_VAULT_PATH:=vault.bin}"
 

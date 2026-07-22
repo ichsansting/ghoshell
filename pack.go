@@ -45,26 +45,36 @@ func runPack(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// pack is the whole authoring round trip: unlock the vault, run the in-binary
-// TUI over its manifest, and — only if the user saves — re-seal (vault.Seal
-// always rotates salt+nonce) and push the new blob so a launch elsewhere
-// pulls the change.
+// pack is the whole authoring round trip: unlock the vault (or, if vaultPath
+// doesn't exist yet, start from an empty one — the only way the very first
+// vault ever gets created, since there's no separate init command), run the
+// in-binary TUI over its manifest, and — only if the user saves — re-seal
+// (vault.Seal always rotates salt+nonce) and push the new blob so a launch
+// elsewhere pulls the change.
 func pack(cfg packConfig) error {
 	blob, err := os.ReadFile(cfg.vaultPath)
-	if err != nil {
+	bootstrap := os.IsNotExist(err)
+	if err != nil && !bootstrap {
 		return fmt.Errorf("read vault: %w", err)
 	}
 	pass, err := cfg.readPassphrase()
 	if err != nil {
 		return fmt.Errorf("read passphrase: %w", err)
 	}
-	files, err := vault.Unseal(pass, blob)
-	if err != nil {
-		return err
-	}
-	m, err := manifestFromVault(files)
-	if err != nil {
-		return err
+
+	var files []vault.File
+	m := Manifest{Profiles: map[string][]string{}, Components: map[string]Component{}}
+	if !bootstrap {
+		files, err = vault.Unseal(pass, blob)
+		if err != nil {
+			return err
+		}
+		m, err = manifestFromVault(files)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintf(cfg.stdout, "pack: no vault at %s — creating a new one\n", cfg.vaultPath)
 	}
 
 	edited, save, err := runTUI(m, cfg.stdin, cfg.stdout)

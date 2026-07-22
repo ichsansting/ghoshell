@@ -220,6 +220,86 @@ func runGitOrSkip(t *testing.T, dir string, args ...string) {
 	}
 }
 
+// TestPackBootstrapsNewVault covers 08's gap: pack previously required an
+// existing vault (os.ReadFile fails otherwise), so there was no way to create
+// the very first one. A missing vaultPath must start pack from an empty
+// manifest instead of erroring, so `gho pack <new-path>` can author + push a
+// vault that never existed before.
+func TestPackBootstrapsNewVault(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	const pass = "correct horse battery staple"
+
+	remote := t.TempDir()
+	runGitOrSkip(t, remote, "init", "--bare", "-b", "main", ".")
+
+	clone := t.TempDir()
+	runGitOrSkip(t, clone, "clone", remote, ".")
+	runGitOrSkip(t, clone, "config", "user.email", "test@example.com")
+	runGitOrSkip(t, clone, "config", "user.name", "Test")
+	// pushVault's plain "git push" needs an upstream already set — pack itself
+	// never configures one, same as a fresh clone would need before its first
+	// push of anything.
+	runGitOrSkip(t, clone, "commit", "--allow-empty", "-m", "init")
+	runGitOrSkip(t, clone, "push", "-u", "origin", "main")
+
+	vaultPath := filepath.Join(clone, "vault.bin")
+	if _, err := os.Stat(vaultPath); !os.IsNotExist(err) {
+		t.Fatalf("vaultPath must not exist yet, stat err = %v", err)
+	}
+
+	cfg := packConfig{
+		vaultPath:      vaultPath,
+		readPassphrase: func() (string, error) { return pass, nil },
+		stdin: strings.NewReader(strings.Join([]string{
+			"component new shell",
+			"component shell tool add fish",
+			"component shell tool add starship",
+			"component shell file set .config/fish/config.fish starship init fish | source",
+			"profile new default",
+			"profile default add shell",
+			"save",
+		}, "\n") + "\n"),
+		stdout: &bytes.Buffer{},
+		runGit: (*exec.Cmd).Run,
+	}
+	if err := pack(cfg); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+
+	fetch := t.TempDir()
+	runGitOrSkip(t, fetch, "clone", remote, ".")
+	blob, err := os.ReadFile(filepath.Join(fetch, "vault.bin"))
+	if err != nil {
+		t.Fatalf("read pushed vault: %v", err)
+	}
+	files, err := vault.Unseal(pass, blob)
+	if err != nil {
+		t.Fatalf("unseal pushed vault: %v", err)
+	}
+	m, err := manifestFromVault(files)
+	if err != nil {
+		t.Fatalf("manifestFromVault: %v", err)
+	}
+	if comps := m.Profiles["default"]; len(comps) != 1 || comps[0] != "shell" {
+		t.Fatalf("profiles = %+v, want default: [shell]", m.Profiles)
+	}
+	c, ok := m.Components["shell"]
+	if !ok {
+		t.Fatal("component shell missing")
+	}
+	if len(c.Tools) != 2 || c.Tools[0] != "fish" || c.Tools[1] != "starship" {
+		t.Fatalf("tools = %v, want [fish starship]", c.Tools)
+	}
+	if len(c.Files) != 1 || c.Files[0].Path != ".config/fish/config.fish" {
+		t.Fatalf("files = %v", c.Files)
+	}
+	if _, err := Compose(m, "default"); err != nil {
+		t.Fatalf("Compose(default): %v", err)
+	}
+}
+
 // TestPackRoundTrip is 07's own round-trip check: pack a change through a
 // real local git remote, then unseal the pushed blob from a fresh clone and
 // confirm the edit is present.
