@@ -48,11 +48,13 @@ func TestFilterProfilesOrdersBestMatchFirstAndExcludesNonMatches(t *testing.T) {
 	}
 }
 
-func TestFilterProfilesEmptyQueryReturnsAllSorted(t *testing.T) {
-	names := []string{"work", "personal"}
+func TestFilterProfilesEmptyQueryReturnsAllInInputOrder(t *testing.T) {
+	// names is pre-sorted (as profileNames produces); an empty query must
+	// preserve that order rather than ranking by candidate length.
+	names := []string{"peer-review", "personal", "work"}
 	got := filterProfiles(names, "")
-	if len(got) != 2 {
-		t.Fatalf("filterProfiles(\"\") = %v, want both names present", got)
+	if strings.Join(got, ",") != strings.Join(names, ",") {
+		t.Errorf("filterProfiles(\"\") = %v, want %v (unchanged order)", got, names)
 	}
 }
 

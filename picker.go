@@ -30,7 +30,10 @@ func fuzzyScore(query, candidate string) (matched bool, score int) {
 	q := []rune(strings.ToLower(query))
 	c := []rune(strings.ToLower(candidate))
 	if len(q) == 0 {
-		return true, len(c)
+		// Every candidate ties at score 0, so the stable sort in
+		// filterProfiles leaves them in the caller's (sorted) input order
+		// instead of ranking by candidate length.
+		return true, 0
 	}
 	qi, last := 0, -1
 	for ci, r := range c {

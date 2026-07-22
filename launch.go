@@ -86,7 +86,7 @@ func launch(cfg launchConfig) error {
 	if err != nil {
 		return err
 	}
-	profile, err := choseProfile(m, cfg.pickProfile)
+	profile, err := chooseProfile(m, cfg.pickProfile)
 	if err != nil {
 		return err
 	}
@@ -158,11 +158,11 @@ func manifestFromVault(files []vault.File) (Manifest, error) {
 	return Manifest{}, fmt.Errorf("vault has no %s", manifestPath)
 }
 
-// choseProfile picks the profile to launch: a single-profile vault
+// chooseProfile picks the profile to launch: a single-profile vault
 // auto-selects it (05's spec — the picker never even runs), otherwise the
 // injected pickProfile decides, given profile names read strictly
 // post-decrypt.
-func choseProfile(m Manifest, pickProfile func([]string) (string, error)) (string, error) {
+func chooseProfile(m Manifest, pickProfile func([]string) (string, error)) (string, error) {
 	names := profileNames(m)
 	if len(names) == 0 {
 		return "", fmt.Errorf("manifest has no profiles")
