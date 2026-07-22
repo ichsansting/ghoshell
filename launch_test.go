@@ -137,6 +137,107 @@ func snapshotPerms(t *testing.T, root string) map[string]os.FileMode {
 	return out
 }
 
+// multiProfileFixtureVault seals a manifest with two disjoint profiles, so
+// tests can drive the picker seam without touching the single-profile
+// fixtureVault the other tests rely on.
+func multiProfileFixtureVault(t *testing.T, pass string) string {
+	t.Helper()
+	m := Manifest{
+		Profiles: map[string][]string{
+			"personal": {"base"},
+			"work":     {"work-only"},
+		},
+		Components: map[string]Component{
+			"base": {
+				Tools: []string{"fish"},
+				Files: []File{{Path: ".config/fish/config.fish", Content: "personal config"}},
+			},
+			"work-only": {
+				Tools: []string{"python@3.12"},
+				Files: []File{{Path: ".config/work.conf", Content: "work config"}},
+			},
+		},
+	}
+	manifestJSON, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	blob, err := vault.Seal(pass, []vault.File{
+		{Path: manifestPath, Mode: 0o600, Data: manifestJSON},
+	})
+	if err != nil {
+		t.Fatalf("seal fixture: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "vault.blob")
+	if err := os.WriteFile(path, blob, 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	return path
+}
+
+// TestLaunchMultiProfileFeedsPickedChoiceIntoCompose is the picker seam
+// (ticket 05): with more than one profile, launch defers to the injected
+// picker, offers it every profile name sorted, and materializes exactly the
+// chosen profile's files — never the other profile's.
+func TestLaunchMultiProfileFeedsPickedChoiceIntoCompose(t *testing.T) {
+	const pass = "correct horse battery staple"
+	vaultPath := multiProfileFixtureVault(t, pass)
+
+	var gotNames []string
+	var snapshot map[string]os.FileMode
+
+	cfg := launchConfig{
+		vaultPath:      vaultPath,
+		readPassphrase: func() (string, error) { return pass, nil },
+		pickProfile: func(names []string) (string, error) {
+			gotNames = names
+			return "work", nil
+		},
+		run: func(cmd *exec.Cmd) error {
+			snapshot = snapshotPerms(t, cmd.Dir)
+			return nil
+		},
+	}
+
+	if err := launch(cfg); err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+
+	wantNames := []string{"personal", "work"}
+	if strings.Join(gotNames, ",") != strings.Join(wantNames, ",") {
+		t.Errorf("pickProfile got names %v, want %v", gotNames, wantNames)
+	}
+
+	if _, ok := snapshot[".config/work.conf"]; !ok {
+		t.Errorf("HOME missing the picked profile's file, got %v", snapshot)
+	}
+	if _, ok := snapshot[".config/fish/config.fish"]; ok {
+		t.Errorf("HOME has the unpicked profile's file: %v", snapshot)
+	}
+}
+
+// TestLaunchSingleProfileSkipsThePicker locks in 05's other half: a
+// single-profile vault auto-selects and never invokes the picker at all, so
+// 04's original behavior still holds unchanged.
+func TestLaunchSingleProfileSkipsThePicker(t *testing.T) {
+	const pass = "correct horse battery staple"
+	vaultPath := fixtureVault(t, pass)
+
+	cfg := launchConfig{
+		vaultPath:      vaultPath,
+		readPassphrase: func() (string, error) { return pass, nil },
+		pickProfile: func([]string) (string, error) {
+			t.Fatal("pickProfile called for a single-profile vault")
+			return "", nil
+		},
+		run: func(cmd *exec.Cmd) error { return nil },
+	}
+
+	if err := launch(cfg); err != nil {
+		t.Fatalf("launch: %v", err)
+	}
+}
+
 func TestLaunchWrongPassphraseFailsLoud(t *testing.T) {
 	vaultPath := fixtureVault(t, "right")
 	err := launch(launchConfig{

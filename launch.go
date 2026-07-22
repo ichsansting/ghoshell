@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -40,7 +39,8 @@ const manifestPath = "manifest.json"
 type launchConfig struct {
 	vaultPath      string
 	readPassphrase func() (string, error)
-	run            func(*exec.Cmd) error // default (*exec.Cmd).Run
+	pickProfile    func([]string) (string, error) // only called when there's more than one profile
+	run            func(*exec.Cmd) error          // default (*exec.Cmd).Run
 }
 
 func runLaunch(args []string, _, stderr io.Writer) int {
@@ -51,6 +51,7 @@ func runLaunch(args []string, _, stderr io.Writer) int {
 	cfg := launchConfig{
 		vaultPath:      args[0],
 		readPassphrase: promptPassphrase,
+		pickProfile:    pickProfilePrompt,
 		run:            (*exec.Cmd).Run,
 	}
 	if err := launch(cfg); err != nil {
@@ -85,7 +86,7 @@ func launch(cfg launchConfig) error {
 	if err != nil {
 		return err
 	}
-	profile, err := soleProfile(m)
+	profile, err := chooseProfile(m, cfg.pickProfile)
 	if err != nil {
 		return err
 	}
@@ -157,19 +158,19 @@ func manifestFromVault(files []vault.File) (Manifest, error) {
 	return Manifest{}, fmt.Errorf("vault has no %s", manifestPath)
 }
 
-// soleProfile picks the profile to launch. There is no picker yet (ticket 05),
-// so it takes the first profile by sorted name — deterministic for the single
-// and multi-profile cases alike.
-func soleProfile(m Manifest) (string, error) {
-	if len(m.Profiles) == 0 {
+// chooseProfile picks the profile to launch: a single-profile vault
+// auto-selects it (05's spec — the picker never even runs), otherwise the
+// injected pickProfile decides, given profile names read strictly
+// post-decrypt.
+func chooseProfile(m Manifest, pickProfile func([]string) (string, error)) (string, error) {
+	names := profileNames(m)
+	if len(names) == 0 {
 		return "", fmt.Errorf("manifest has no profiles")
 	}
-	names := make([]string, 0, len(m.Profiles))
-	for n := range m.Profiles {
-		names = append(names, n)
+	if len(names) == 1 {
+		return names[0], nil
 	}
-	sort.Strings(names)
-	return names[0], nil
+	return pickProfile(names)
 }
 
 // session is one ephemeral HOME and the state its wipe needs.
