@@ -20,6 +20,14 @@ Sub-questions to resolve:
 
 ## Answer
 
+> **SUPERSEDED IN PART by [05](05-bundle-storage-sync.md):** tool provisioning changed
+> from ghoshell-bundled content-addressed static binaries to **mise** resolving tools
+> on-demand. Points **2, 4, 5, 8 below no longer hold** — ghoshell hosts no tool assets;
+> there are no `gho-tool-<sha>` bundles; the launcher fetches `mise` and runs tools via
+> `mise x` / `github:…`. Still standing: **1** (manifest, TUI-managed), **3** (3-arch
+> matrix), **6** (ephemeral HOME), **7** (no tiers → profiles). The `ponytail:` "not a
+> package manager" stance is explicitly reversed — mise *is* the package manager now.
+
 **A curated manifest declares the payload; tools are public content-addressed assets fetched by arch; everything materializes into an ephemeral HOME.**
 
 1. **Authoring = manifest, TUI-managed.** A declarative manifest is the source of

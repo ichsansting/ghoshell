@@ -4,8 +4,10 @@ Type: grilling
 Status: open
 Blocked by: —
 
-<!-- Builds on resolved 02 (post-decrypt picker), 03 (manifest, tools-by-hash),
-     04 (single sealed blob, path-keyed files). All three resolved → frontier. -->
+<!-- Builds on resolved 02 (post-decrypt picker), 03 (manifest, TUI-managed),
+     04 (single sealed blob, path-keyed files), 05 (tools = mise, not ghoshell-hosted).
+     All resolved → frontier. NOTE: 05 superseded 03's tools-by-hash — a profile now lists
+     mise tool specs (e.g. python@latest, github:rg), not content-addressed hashes. -->
 
 ## Question
 
@@ -17,7 +19,7 @@ Sub-questions to resolve:
 
 - **Schema shape** — one manifest with a top-level `profiles:` map, or N manifests inside
   the blob? What does the picker (02) enumerate?
-- **Per-profile vs. shared** — does each profile own its full {tools-by-hash (03), config
+- **Per-profile vs. shared** — does each profile own its full {mise tool specs (05), config
   files, secret files (04)} set, or reference a shared pool? (Full profile *inheritance* is
   explicitly post-v1 fog — this ticket only needs to decide whether v1 duplicates or shares,
   not build an inheritance system.)
