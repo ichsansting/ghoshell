@@ -8,14 +8,14 @@ isolation before anything materializes it.
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `seal(passphrase, files) → blob` and `unseal(passphrase, blob) → files` round-trip:
+- [x] `seal(passphrase, files) → blob` and `unseal(passphrase, blob) → files` round-trip:
       `unseal(seal(x)) == x`, preserving each file's path, POSIX perms, and `secret:true`.
-- [ ] Crypto is Argon2id (memory-hard KDF) + XChaCha20-Poly1305 (AEAD), via `x/crypto` only.
-- [ ] Blob layout is a plaintext header (Argon2id params + salt + nonce) followed by the
+- [x] Crypto is Argon2id (memory-hard KDF) + XChaCha20-Poly1305 (AEAD), via `x/crypto` only.
+- [x] Blob layout is a plaintext header (Argon2id params + salt + nonce) followed by the
       ciphertext of a `tar` of the files.
-- [ ] A wrong passphrase fails loud (AEAD auth failure) — never a silent or partial extract.
-- [ ] Each `seal` of identical plaintext rotates salt + nonce → distinct ciphertext.
-- [ ] Table-driven `_test.go` covering round-trip, perms/secret preservation, wrong-pass
+- [x] A wrong passphrase fails loud (AEAD auth failure) — never a silent or partial extract.
+- [x] Each `seal` of identical plaintext rotates salt + nonce → distinct ciphertext.
+- [x] Table-driven `_test.go` covering round-trip, perms/secret preservation, wrong-pass
       failure, and ciphertext-distinctness.

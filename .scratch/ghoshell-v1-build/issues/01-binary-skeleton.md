@@ -7,9 +7,9 @@ exits; any other invocation prints usage. This is the prefactor every other tick
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Go module initialized; binary builds with `CGO_ENABLED=0` (no libc dependency).
-- [ ] `gho launch` and `gho pack` each dispatch to a distinct entry point (stub bodies OK).
-- [ ] Unknown/absent subcommand prints usage and exits non-zero.
-- [ ] Cross-compiles for `linux/arm64` locally as a smoke check (full 3-arch matrix is 08).
+- [x] Go module initialized; binary builds with `CGO_ENABLED=0` (no libc dependency).
+- [x] `gho launch` and `gho pack` each dispatch to a distinct entry point (stub bodies OK).
+- [x] Unknown/absent subcommand prints usage and exits non-zero.
+- [x] Cross-compiles for `linux/arm64` locally as a smoke check (full 3-arch matrix is 08).
