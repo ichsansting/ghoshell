@@ -168,6 +168,30 @@ func TestRunTUIToolRmAndFileRm(t *testing.T) {
 	}
 }
 
+// TestSpliceManifestPreservesOtherEntries guards against re-sealing dropping
+// any vault entry besides manifest.json — pack must carry the whole vault
+// forward, not rebuild it from just the one entry it edits.
+func TestSpliceManifestPreservesOtherEntries(t *testing.T) {
+	files := []vault.File{
+		{Path: "other.txt", Data: []byte("keep me")},
+		{Path: manifestPath, Mode: 0o600, Data: []byte("old")},
+	}
+	got := spliceManifest(files, []byte("new"))
+	if len(got) != 2 {
+		t.Fatalf("got %d files, want 2: %+v", len(got), got)
+	}
+	byPath := map[string]vault.File{}
+	for _, f := range got {
+		byPath[f.Path] = f
+	}
+	if string(byPath["other.txt"].Data) != "keep me" {
+		t.Errorf("other.txt = %q, want preserved", byPath["other.txt"].Data)
+	}
+	if string(byPath[manifestPath].Data) != "new" {
+		t.Errorf("manifest.json = %q, want %q", byPath[manifestPath].Data, "new")
+	}
+}
+
 // fixtureVaultAt seals m at path under pass — the pack-side counterpart of
 // launch_test.go's fixtureVault, parameterized on path since pack needs the
 // vault to live inside a git working tree it controls.

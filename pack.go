@@ -80,9 +80,7 @@ func pack(cfg packConfig) error {
 	if err != nil {
 		return fmt.Errorf("marshal manifest: %w", err)
 	}
-	newBlob, err := vault.Seal(pass, []vault.File{
-		{Path: manifestPath, Mode: 0o600, Data: manifestJSON},
-	})
+	newBlob, err := vault.Seal(pass, spliceManifest(files, manifestJSON))
 	if err != nil {
 		return fmt.Errorf("seal vault: %w", err)
 	}
@@ -91,6 +89,25 @@ func pack(cfg packConfig) error {
 	}
 
 	return pushVault(cfg)
+}
+
+// spliceManifest returns files with manifest.json's content replaced by data,
+// preserving every other vault entry untouched — re-sealing must carry the
+// whole vault forward, not just rebuild it from the one entry pack edits.
+func spliceManifest(files []vault.File, data []byte) []vault.File {
+	next := make([]vault.File, 0, len(files)+1)
+	replaced := false
+	for _, f := range files {
+		if f.Path == manifestPath {
+			f.Data = data
+			replaced = true
+		}
+		next = append(next, f)
+	}
+	if !replaced {
+		next = append(next, vault.File{Path: manifestPath, Mode: 0o600, Data: data})
+	}
+	return next
 }
 
 // pushVault commits the re-sealed blob and pushes it. Git resolves the repo
@@ -231,6 +248,20 @@ func profilesUsing(m Manifest, name string) []string {
 	return names
 }
 
+// applyIfValid runs mutate against m, validates the profiles it affects (03's
+// disjointness rule via Compose), and rolls back to the pre-mutation state on
+// failure — the "at author time" enforcement every kind of edit in this TUI
+// shares.
+func applyIfValid(m *Manifest, affected []string, mutate func(*Manifest)) error {
+	before := cloneManifest(*m)
+	mutate(m)
+	if err := validateProfiles(*m, affected); err != nil {
+		*m = before
+		return err
+	}
+	return nil
+}
+
 func validateProfiles(m Manifest, names []string) error {
 	for _, name := range names {
 		if _, err := Compose(m, name); err != nil {
@@ -334,21 +365,8 @@ func handleProfile(m *Manifest, args []string, out io.Writer) error {
 		default:
 			return fmt.Errorf("usage: profile %s add|rm <component>", name)
 		}
-		return trySetProfile(m, name, next)
+		return applyIfValid(m, []string{name}, func(m *Manifest) { m.Profiles[name] = next })
 	}
-}
-
-// trySetProfile applies a tentative component list for a profile, validates
-// it (the disjointness rule, 03's Compose), and rolls back on failure — the
-// "at author time" enforcement the TUI owes 07.
-func trySetProfile(m *Manifest, name string, comps []string) error {
-	prev := m.Profiles[name]
-	m.Profiles[name] = comps
-	if err := validateProfiles(*m, []string{name}); err != nil {
-		m.Profiles[name] = prev
-		return err
-	}
-	return nil
 }
 
 // handleComponent dispatches "component ..." subcommands. args is the line's
@@ -404,36 +422,26 @@ func handleComponentTool(m *Manifest, name string, args []string) error {
 		return fmt.Errorf("usage: component %s tool add|rm <spec>", name)
 	}
 	c := m.Components[name]
+	var next []string
 	switch args[0] {
 	case "add":
-		next := append(append([]string{}, c.Tools...), args[1])
-		return trySetComponentTools(m, name, next)
+		next = append(append([]string{}, c.Tools...), args[1])
 	case "rm":
 		toolName := args[1]
-		var next []string
 		for _, t := range c.Tools {
 			n, _ := splitToolSpec(t)
 			if n != toolName {
 				next = append(next, t)
 			}
 		}
-		return trySetComponentTools(m, name, next)
 	default:
 		return fmt.Errorf("usage: component %s tool add|rm <spec>", name)
 	}
-}
-
-func trySetComponentTools(m *Manifest, name string, tools []string) error {
-	c := m.Components[name]
-	prev := c.Tools
-	c.Tools = tools
-	m.Components[name] = c
-	if err := validateProfiles(*m, profilesUsing(*m, name)); err != nil {
-		c.Tools = prev
+	return applyIfValid(m, profilesUsing(*m, name), func(m *Manifest) {
+		c := m.Components[name]
+		c.Tools = next
 		m.Components[name] = c
-		return err
-	}
-	return nil
+	})
 }
 
 // handleComponentFile handles "file set|secret|rm ..." for one component.
@@ -445,23 +453,27 @@ func handleComponentFile(m *Manifest, name string, args []string) error {
 		return fmt.Errorf("usage: component %s file set|secret|rm <path> [content...]", name)
 	}
 	c := m.Components[name]
+	var next []File
 	switch args[0] {
 	case "set", "secret":
 		if len(args) < 3 {
 			return fmt.Errorf("usage: component %s file %s <path> <content...>", name, args[0])
 		}
 		path, content := args[1], strings.Join(args[2:], " ")
-		next := setFile(c.Files, File{Path: path, Content: content, Secret: args[0] == "secret"})
-		return trySetComponentFiles(m, name, next)
+		next = setFile(c.Files, File{Path: path, Content: content, Secret: args[0] == "secret"})
 	case "rm":
-		next := removeFile(c.Files, args[1])
+		next = removeFile(c.Files, args[1])
 		if len(next) == len(c.Files) {
 			return fmt.Errorf("component %q has no file %q", name, args[1])
 		}
-		return trySetComponentFiles(m, name, next)
 	default:
 		return fmt.Errorf("usage: component %s file set|secret|rm <path> [content...]", name)
 	}
+	return applyIfValid(m, profilesUsing(*m, name), func(m *Manifest) {
+		c := m.Components[name]
+		c.Files = next
+		m.Components[name] = c
+	})
 }
 
 func setFile(files []File, f File) []File {
@@ -489,17 +501,4 @@ func removeFile(files []File, path string) []File {
 		}
 	}
 	return next
-}
-
-func trySetComponentFiles(m *Manifest, name string, files []File) error {
-	c := m.Components[name]
-	prev := c.Files
-	c.Files = files
-	m.Components[name] = c
-	if err := validateProfiles(*m, profilesUsing(*m, name)); err != nil {
-		c.Files = prev
-		m.Components[name] = c
-		return err
-	}
-	return nil
 }
