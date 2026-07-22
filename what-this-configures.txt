@@ -1,0 +1,207 @@
+WHAT GETS CONFIGURED
+====================
+A complete developer home environment (Linux & macOS), set up in one
+apply. WORK and CLAUDE OAUTH sections are optional and off by default.
+
+FORMAT — each entry:
+  [action] name — description
+      key = real value          (exact values, for replication)
+ACTIONS:
+  [install]        the tool is installed, default settings
+  [config]         settings are written (tool itself not installed here)
+  [install+config] installed and configured
+  [deploy]         a file is placed into $HOME as-is
+  [deploy:secret]  same, but stored encrypted; decrypted on apply
+
+SHELL & TERMINAL
+----------------
+[install+config] fish — the shell
+    plugin = done  (desktop notification when a long command finishes)
+
+[config] fish abbreviations — typed word expands to the real command:
+    ls  = "eza --icons"          ll  = "eza --icons -la"
+    lt  = "eza --icons --tree"   cat = "bat"
+    grep = "rg"                  find = "fd"
+    top = "btop"                 htop = "btop"
+    du  = "dust"                 df  = "duf"
+    diff = "delta"               fm  = "yazi"
+    claude = "BUN_JSC_useJIT=0 claude"   (JIT crash workaround)
+    gst = "git status"
+    glg = "git log --oneline --graph --decorate --all"
+    gco = "git checkout"         gbr = "git branch"
+    gunstage = "git reset HEAD --"
+    glast = "git log -1 HEAD"
+
+[install+config] starship — shell prompt
+    palette = Catppuccin Mocha (standard published palette)
+    segments, in order = username, hostname, directory, git branch,
+      git status, nix shell, rust, python, node, command duration,
+      line break, prompt character
+    directory = bold lavender, show last 4 dirs, never truncate to repo
+    cmd_duration = shown when a command took >= 2000 ms
+
+[install+config] atuin — shell history
+    auto_sync = true
+    sync_frequency = "5m"
+    search_mode = "fuzzy"
+    flags = --disable-up-arrow   (up-arrow stays normal history)
+
+[install+config] zoxide — smarter cd (jump to frequent directories)
+    fish integration = on
+
+[install+config] zellij — terminal multiplexer
+    default_shell = "fish"
+    mouse_mode = true
+    theme = "catppuccin-mocha"
+    keybinds = unbind "Alt f" and "Alt Right" in all non-locked modes
+      (fixes Alt+Right word-jump across terminals)
+
+EDITOR
+------
+[install+config] helix — the editor
+    default editor = yes ($EDITOR/$VISUAL = hx)
+    theme = "catppuccin_mocha"
+    line-number = relative;  auto-pairs = on
+    file-picker shows hidden files;  indent guides rendered
+    cursor shape = bar (insert), block (normal), underline (select)
+    statusline = mode/spinner/file-name/modified | version-control |
+      diagnostics/selections/position/encoding
+    languages wired to servers/formatters:
+      nix        -> nixd, format with nixfmt, auto-format on
+      bash       -> bash-language-server
+      fish       -> fish-lsp
+      markdown   -> markdown-oxide
+      python     -> ty + ruff, format with "ruff format -", auto-format on
+      typescript/javascript -> typescript-language-server
+      rust       -> rust-analyzer (found on PATH)
+
+[install] language servers/formatters — nixd, bash-language-server,
+    fish-lsp, markdown-oxide, ty, ruff, typescript-language-server,
+    nixfmt
+    note: rust-analyzer intentionally NOT installed here — it comes with
+    the rust toolchain (mise) so their versions always match
+
+VERSION CONTROL
+---------------
+[install+config] git
+    user.name / user.email = taken from the active profile
+      (default: "Ichsan Sting" /
+       "139094570+ichsansting@users.noreply.github.com")
+    commit signing = SSH, key ~/.ssh/id_ed25519, sign by default
+    allowed signers file = ~/.ssh/allowed_signers
+    pull.rebase = true
+    init.defaultBranch = "main"
+    global ignores = .DS_Store, .direnv/, *.local, .mise.local.toml
+
+[install+config] delta — git diff pager
+    features = side-by-side, line-numbers
+    syntax-theme = "Catppuccin Mocha"
+
+[install+config] gh — GitHub CLI
+    git_protocol = "ssh"
+    editor = "hx"
+
+[config] ssh — client config
+    host "github.com" = User git, IdentityFile ~/.ssh/id_ed25519,
+      AddKeysToAgent yes
+    after apply = public key (~/.ssh/id_ed25519.pub) and
+      ~/.ssh/allowed_signers ("<git email> <pubkey>") are derived
+      automatically from the private key
+
+[deploy:secret] ~/.ssh/id_ed25519 — SSH private key
+[deploy:secret] ~/.config/gh/hosts.yml — GitHub CLI login
+
+DEV ENVIRONMENTS
+----------------
+[install+config] mise — per-project tool/runtime version manager
+    auto_install = true
+    idiomatic version files honored for = python, terraform
+    python venvs = auto-created/activated via uv
+    pipx = runs through uvx
+    UV_PYTHON = pinned to mise's active python
+    global tools:
+      rust        = stable
+      python      = 3.13
+      node        = latest
+      bun         = latest
+      uv          = latest
+      claude-code = latest
+      aube        = latest   (Node package manager)
+      iii         = latest   (source: github iii-hq/iii)
+      elio        = latest   (source: cargo elio)
+
+[install+config] direnv — per-directory environments
+    nix-direnv = on
+    load_dotenv = true (.env auto-loaded)
+    integrations = fish, bash
+
+AI TOOLING
+----------
+[install] claude-code — via mise (see above)
+[deploy] ~/.claude/CLAUDE.md — one file built from fragments:
+    - global agent instructions
+    - DOX framework
+    - behavioral guidelines
+[deploy] ~/.claude/settings.json — claude-code preferences
+    (default model, theme, enabled plugins)
+[deploy] ~/.claude/skills/caveman-commit/SKILL.md — skill: terse
+    Conventional Commits message generator
+[deploy] ~/.claude/skills/drop-handoff/SKILL.md — skill: writes
+    HANDOFF.md so a fresh session can continue the work
+
+CLI UTILITIES
+-------------
+[install+config] fzf — fuzzy finder (fish integration = on)
+[install+config] bat — cat/pager with syntax highlighting
+    theme = "Catppuccin Mocha"
+[install] ripgrep (rg) — fast text search
+[install] fd — fast file finder
+[install] eza — modern ls (icons, tree view)
+[install] yazi — terminal file manager
+[install] dust — disk usage viewer
+[install] duf — disk free viewer
+[install] jq — JSON processor
+[install] btop — system monitor
+[install] nvd — diffs between nix generations
+[install] nix-tree — explore nix dependency closures
+[install] comma — run a command without installing it
+
+SESSION ENVIRONMENT
+-------------------
+[config] XDG base directories — enabled and exported
+    XDG_CONFIG_HOME = ~/.config
+    XDG_DATA_HOME   = ~/.local/share
+    XDG_CACHE_HOME  = ~/.cache
+    XDG_STATE_HOME  = ~/.local/state
+[config] default programs
+    EDITOR = "hx";  VISUAL = "hx"
+    PAGER = "bat";  MANPAGER = "bat -l man -p"
+
+WORK (optional, off by default)
+-------------------------------
+[install] awscli2 — AWS command-line interface
+[install] docker — container CLI
+[install] ast-grep — structural code search/rewrite
+[install+config] granted — AWS role switcher (fish integration = on)
+
+[config] work session variables
+    ANTHROPIC_BASE_URL = "https://litellm.tvlk.cloud"  (company proxy)
+    ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5"
+    ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4.5"
+    ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-4.8"
+    SEARXNG_ENDPOINT = "http://172.17.0.1:8080"
+    TF_PLUGIN_CACHE_DIR = "~/.terraform.d/plugin-cache"
+    NODE_TLS_REJECT_UNAUTHORIZED = "0"
+
+[deploy:secret] ~/.aws/config — AWS CLI profiles
+[deploy:secret] ~/.config/fish/conf.d/traveloka-secrets.fish — work env
+    secrets (e.g. the LiteLLM auth token)
+[deploy] ~/.omp/agent/AGENTS.md — Pi agent global instructions
+[deploy] ~/.omp/agent/config.yml — Pi agent preferences (theme,
+    model roles)
+[deploy] ~/.omp/agent/models.yml — custom model provider pointing at
+    the company LiteLLM proxy
+
+CLAUDE OAUTH (optional, off by default)
+---------------------------------------
+[deploy:secret] ~/.claude/.credentials.json — Claude Code OAuth login
